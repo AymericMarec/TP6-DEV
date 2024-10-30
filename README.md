@@ -84,6 +84,8 @@ def GenerateColor():
     rand = random.randint(0, len(Colors)-1)
     return Colors[rand]
 
+
+
 #je l'ajoute donc au dictionnaire
 CLIENTS[addr] = {}
 CLIENTS[addr]["r"] = reader
@@ -91,9 +93,14 @@ CLIENTS[addr]["w"] = writer
 CLIENTS[addr]["pseudo"] = ""
 CLIENTS[addr]["color"] = GenerateColor()
 
+
+
 # a l'envoie du message , je rajoute la couleur
-message = f"{color}{pseudo} a dit : {data.decode()}"
+message = f"{color}[{pseudo}] : {data.decode()}"
+
+
 # et dans la fonction pour envoyer le message , je rajoute a la fin un couleur qui remet la couleur de base 
+message+= '\033[0m'
 # (sinon ca bloque le terminal en rouge violet ou bleu quoi , c'est drole mais 2m)
 ```
 
@@ -105,6 +112,7 @@ def GetTime():
     ts = time.time()
     date = datetime.datetime.fromtimestamp(ts).strftime('%H:%M')
     return date
+
 
 #on envoie le message en rajoutant la date
 message = f"{color}{GetTime()} [{pseudo}] : {data.decode()}"
@@ -133,9 +141,19 @@ def CalculTailleOctet(Nb):
             else: 
                 return int((bit/8)+1)
 
+
+
 #apres avoir empecher une taille de pseudo trop grande je l'envoie au serveur
+pseudo = input("Choisir votre pseudo :\n\n")
+if(len(pseudo)>15):
+    print("pseudo trop long")
+    return
+reader, writer = await asyncio.open_connection(host="192.168.1.21", port=13337)
 writer.write(len(pseudo).to_bytes())
 writer.write(pseudo.encode())
+await writer.drain()
+
+
 
 #j'ai aussi une fonction que j'appelle pour envoyer un message
 async def SendMessage(message,writer):
