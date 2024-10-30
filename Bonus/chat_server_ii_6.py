@@ -60,7 +60,7 @@ async def handle_client_msg(reader,writer) :
             break
         #On envoie le message a tout le monde
         color = CLIENTS[addr]["color"]
-        message = f"{color}{GetTime()} | {pseudo} a dit : {data.decode()}"
+        message = f"{color}{GetTime()} [{pseudo}] : {data.decode()}"
         print(f"Message received from {addr[0]}:{addr[1]} : {message}")
         await SendBroadCastMessage(addr,message)
 
