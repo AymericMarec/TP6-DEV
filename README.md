@@ -245,4 +245,7 @@ def Command(input):
 ```
 # Voila un exemple d'image :
 
+Apres avoir tapé : "/di shrek.jpg"
+
+
 ![](./Image/ShrekAscii.png)
