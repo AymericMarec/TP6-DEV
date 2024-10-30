@@ -69,6 +69,8 @@ Chat entre différents users :
 
 ## Bonus :
 
+Pour les bonus je vais juste montrer les parties de code rajoutés / modifiés , pour que ce soit un minimum lisible
+
 ### 1. Basic Cosmetic
 
 J'ai juste ajouté les couleurs , le "vous avez dit" est simple a faire et met en doublon le message ce qui est moins beau a mon gout , donc j'ai juste fait les couleurs et le time stamp
@@ -108,6 +110,10 @@ def GetTime():
 message = f"{color}{GetTime()} | {pseudo} a dit : {data.decode()}"
 
 ```
+
+# Voila le resultat :
+
+![](./Image/ScreenColor.png) 
 
 ### 4. Encodage maison
 
