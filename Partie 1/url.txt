@@ -1,0 +1,10 @@
+https://www.ynov.com
+https://example.org
+https://www.thinkerview.com
+https://www.torproject.org
+https://google.com
+https://stackoverflow.com
+https://github.com
+https://www.w3schools.com
+https://docs.python.org/3/
+https://doc.rust-lang.org/book/
