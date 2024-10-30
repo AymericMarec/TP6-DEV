@@ -107,11 +107,11 @@ def GetTime():
     return date
 
 #on envoie le message en rajoutant la date
-message = f"{color}{GetTime()} | {pseudo} a dit : {data.decode()}"
+message = f"{color}{GetTime()} [{pseudo}] : {data.decode()}"
 
 ```
 
-# Voila le resultat :
+## Voila le resultat :
 
 ![](./Image/ScreenColor.png) 
 
