@@ -73,8 +73,6 @@ Pour les bonus je vais juste montrer les parties de code rajoutés / modifiés ,
 
 ### 1. Basic Cosmetic
 
-J'ai juste ajouté les couleurs , le "vous avez dit" est simple a faire et met en doublon le message ce qui est moins beau a mon gout , donc j'ai juste fait les couleurs et le time stamp
-
 - Couleurs :
 
 ```python
@@ -122,6 +120,59 @@ message = f"{color}{GetTime()} [{pseudo}] : {data.decode()}"
 ## Voila le resultat :
 
 ![](./Image/ScreenColor.png) 
+
+### 3. Config et arguments
+
+Pour cette partie j'ai juste reprit un ancien code :
+
+```python
+
+def GetInfos():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--port", action="store")
+    parser.add_argument("-l", "--listen", action="store")
+    args = parser.parse_args()
+    if(args.port == None):
+        port = 13337 
+    else :
+        ValidePort(args.port)
+        port = args.port
+
+    if(args.listen == None):
+        host = ''
+    else :
+        ValideIP(args.listen)
+        host = args.listen
+    return port,host
+
+def ValidePort(port):
+    try:
+        port = int(port)
+        if port < 0 or port > 65535:
+            print(f"-p argument invalide. Le port spécifié {port} n'est pas un port valide (de 0 à 65535)")
+            exit(1)
+        elif port < 1024:
+            print(f"ERROR -p argument invalide. Le port spécifié {port} est un port privilégié. Spécifiez un port au dessus de 1024.")
+            exit(2)
+
+    except:
+        raise TypeError("Le port ca doit etre un nombre hein")
+
+def ValideIP(ip):
+    if not re.search(r"^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$",ip) :
+        print(f"ERROR -l argument invalide. L'adresse {ip} n'est pas une adresse IP valide.")
+        exit(3)
+    elif not ip in str(psutil.net_if_addrs()):
+        print(f"ERROR -l argument invalide. L'adresse {ip} n'est pas l'une des adresses IP de cette machine.")
+        exit(4)
+
+
+
+# Et je lance le serveur dans mon main :
+
+port,host = GetInfos()
+server = await asyncio.start_server(handle_client_msg, host, port)
+```
 
 ### 4. Encodage maison
 
@@ -249,3 +300,158 @@ Apres avoir tapé : "/di shrek.jpg"
 
 
 ![](./Image/ShrekAscii.png)
+
+
+### 6. Gestion d'historique
+
+Tout d'abord , j'ai rajouté le chemin du dossier .json a mettre dans les arguments 
+
+```python
+parser.add_argument("-hp", "--path", action="store")
+#   hp pour HistoricPath , -h et -p etant deja prit
+#   et par defaut la valeur est ""  , le fichier sera donc créer la ou le serveur a été éxecuté
+```
+
+Pour avoir un historique , il va falloir deja ajouté des messages !
+
+```python
+#On lit le fichier main.json ( main car plus tard il y aura un systeme de salon avec a chacun son historique)
+async def GetHistoric():
+    global historicPath
+    async with aiofiles.open(historicPath+"/main.json", "r",encoding="utf-8") as file:
+        content = await file.read() #   On lit dans le fichier json
+        try :   #   Si il y a du contenu
+            data = json.loads(content)
+        except :
+            return None
+    return data
+
+async def AddHistoric(message):
+    global historicPath
+    Historic = await GetHistoric()
+    if Historic == None:    #   Si il y a pas d'historique ( fichier vide )
+        Historic = {}
+        Historic["msg"] = []
+    Historic["msg"].append(message)  
+    async with aiofiles.open(historicPath+"/main.json", "w",encoding="utf-8") as file:
+        await file.write(json.dumps(Historic))
+        await file.flush()
+
+#fonction appelé quand un user se connecte 
+async def DisplayHistoric(writer):
+    historic = await GetHistoric()
+    if not historic : return
+    if len(historic["msg"]) > 50:   #   Si il y a plus de 50 message dans le fichier json , on supprime ceux en trop
+        await DeletHistoric()       #   pour pas créer un fichier gigantesque ou les 50 messages seront utiles sur 10000
+        print("delete")
+    for msg in historic["msg"][-50:]:
+        writer.write((msg+"\n").encode())
+        await writer.drain()
+
+async def DeletHistoric():
+    global historicPath
+    Historic = await GetHistoric()
+    Historic["msg"] = Historic["msg"][-20:] 
+    print(Historic)
+    async with aiofiles.open(historicPath+"/main.json", "w",encoding="utf-8") as file:
+        await file.write(json.dumps(Historic))
+        await file.flush()
+
+
+# j'ai juste appelé la fonction DisplayHistoric quand la personne se connecte 
+# et j'ai rajouté cette ligne pour a chaque envoie de message :
+await AddHistoric(message)
+```
+
+### 7. Plusieurs rooms
+
+J'ai ajouté une commande a l'utilisateur /room \[numero de room\]
+Par defaut , ils seront dans la room 1
+
+
+- Coté client :
+
+```python
+    #   J'ai rajouté ceci a mon switch pour essayer de connaitre la commande 
+    
+        case "room":
+            try:
+                NbRoom = input[1:].split(" ")[1]    #   Je recupere donc le numero de la room
+            except:
+                print("Pas de numéro de room donné")
+                return None,None
+            try:
+                NbRoom = int(NbRoom)
+            except:
+                print("La room donné n'est pas un nombre !")
+                return None,None
+            if(NbRoom > 999999):
+                print("Numéro de room trop grand")
+                return None,None
+            return "room",NbRoom    #   Si il a passé tout les tests , on passe a la suite
+
+    if(input[0] == "/"):
+        type,result = Command(input)
+        if type == None : continue
+        if(type=="Image"):
+            image = result.to_terminal()
+            await SendMessage(image,writer)
+        elif(type=="room"):     #   Si la commande est un changement de room
+            LenNb = CalculTailleOctet(result)
+            writer.write((3).to_bytes())    #   On envoie avec un header numero 3
+            writer.write((LenNb).to_bytes(2))   #   La taille en octet du numero de room
+            writer.write(result.to_bytes(LenNb))    #   Et on envoie le numero de room
+            await writer.drain()
+            print("--------------------------------\n")
+            print(f"          Room n°{result}")
+            print("\n--------------------------------")
+        continue
+```
+
+- Coté serveur :
+  
+Pour gérer les room , j'ai préféré juste rajouter un parametre a chaque client , j'ai trouvé ca plus simple a gérer et a parcourir
+
+
+```python
+    #On ajoute la section room
+    if not addr in CLIENTS :
+        CLIENTS[addr] = {}
+        CLIENTS[addr]["r"] = reader
+        CLIENTS[addr]["w"] = writer
+        CLIENTS[addr]["pseudo"] = ""
+        CLIENTS[addr]["color"] = GenerateColor()
+        CLIENTS[addr]["room"] = 1   #   Par defaut a 1
+
+
+
+    #   Quand je recois mon numero de header , j'ajoute cette partie : 
+        elif headerNB == 3:  #   Changement de room
+            LenNB = await reader.read(2)
+            print(int.from_bytes(LenNB))
+            RoomNB = await reader.read(int.from_bytes(LenNB))
+            RoomNB = int.from_bytes(RoomNB) 
+            #On afficher le message de deconnexion          
+            message = "\033[38;5;208m"+f"Annonce : {pseudo} a quitté la chatroom"
+            await AddHistoric(message,CLIENTS[addr]["room"])
+            await SendBroadCastMessage(addr,message,CLIENTS[addr]["room"])
+
+            CLIENTS[addr]["room"] = RoomNB  #   On change la room
+
+            #On affiche le message de connexion
+            await DisplayHistoric(writer,RoomNB)
+            message = "\033[38;5;208m"+"Annonce : " + pseudo + " a rejoint la chatroom"
+            await AddHistoric(message,RoomNB)
+            await SendBroadCastMessage(addr,message,RoomNB)
+
+            continue
+
+#   Et on modifie juste la fonction pour envoyer le message pour envoyer a la bonne room !
+async def SendBroadCastMessage(who,message,room):
+    message+= '\033[0m'
+    for client in CLIENTS :
+        if(CLIENTS[client]["room"] == room):
+            CLIENTS[client]["w"].write(message.encode())
+            await CLIENTS[client]["w"].drain()
+
+```
