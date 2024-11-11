@@ -17,11 +17,12 @@ def CalculTailleOctet(Nb):
 
 
 async def Listen(reader):
-    while True:
+    global EXIT
+    while not EXIT:
         data = await reader.read(1024)
         if not data :
             print("\nConnexion au serveur coupé")
-            sys.exit("truc")
+            EXIT = True
         if not data : continue
         msg = data.decode()
         print(msg)
@@ -66,7 +67,8 @@ async def get_hidden_input(prompt=""):
     return hidden_input
 
 async def SendInput(writer):
-    while True:
+    global EXIT
+    while not EXIT:
         input = await aioconsole.ainput()
         sys.stdout.write("\033[F")  #   Ces 2 lignes sont la pour cacher l'input de l'utilisateur
         sys.stdout.write("\033[K")  #   Et voir son message au bon format + couleur
@@ -121,7 +123,11 @@ async def main():
     if(len(pseudo)>15):
         print("pseudo trop long")
         return
-    reader, writer = await asyncio.open_connection(host="192.168.1.21", port=13337)
+    try:
+        reader, writer = await asyncio.open_connection(host="192.168.1.21", port=13337)
+    except:
+        print("Connexion avec le serveur impossible")
+        return
     writer.write(len(pseudo).to_bytes())
     writer.write(pseudo.encode())
     await writer.drain()
@@ -132,6 +138,8 @@ async def main():
         sys.stdout.write("\033[2J")  #   On remonte le terminal pour plus de visibilité si le clear ne marche pas
         sys.stdout.write("\033[H") 
     await asyncio.gather(*tasks)
+global EXIT
+EXIT = False
 
 if __name__ == "__main__" :
     asyncio.run(main())

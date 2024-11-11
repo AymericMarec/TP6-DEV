@@ -87,7 +87,7 @@ async def DisplayHistoric(writer,room):
 
 async def DeletHistoric(room):
     global historicPath
-    Historic = await GetHistoric()
+    Historic = await GetHistoric(room)
     Historic["msg"] = Historic["msg"][-50:] 
     print(Historic)
     async with aiofiles.open(historicPath+f"/{room}.json", "w",encoding="utf-8") as file:
@@ -99,7 +99,7 @@ async def SendBroadCastMessage(who,message,room):
     for client in CLIENTS :
         if(CLIENTS[client]["room"] == room):
             CLIENTS[client]["w"].write(message.encode())
-            await CLIENTS[client]["w"].drain()
+            # await CLIENTS[client]["w"].drain()
 
 def GenerateColor():
     Colors = ['\033[31m','\033[32m','\033[33m','\033[34m','\033[35m','\033[36m','\033[37m','\033[90m','\033[91m','\033[92m','\033[93m','\033[94m','\033[95m','\033[96m']
@@ -110,6 +110,18 @@ def GetTime():
     ts = time.time()
     date = datetime.datetime.fromtimestamp(ts).strftime('%H:%M')
     return date
+async def DeleteHacker(addr,writer):
+    global CLIENTS
+    print(f"Client suspect : {addr[0]} : {addr[1]} ")
+    writer.write(("C'est pas bien de tricher , modifie pas le code , c'est pas bien").encode())  #   on lui empeche l'acces avec un message
+    await writer.drain()
+    CLIENTS.pop(addr)
+
+async def ErrorMessage(writer):
+    print("bad cara use")
+    writer.write(("Problème lors de l'envoie du message , caractere non approprié utilisé").encode())  #   on lui empeche l'acces avec un message
+    await writer.drain()
+
 
 async def handle_client_msg(reader,writer) :
     global CLIENTS
@@ -122,21 +134,37 @@ async def handle_client_msg(reader,writer) :
         CLIENTS[addr]["pseudo"] = ""
         CLIENTS[addr]["color"] = GenerateColor()
         CLIENTS[addr]["room"] = 1
-    await DisplayHistoric(writer,1)
     while True:
 
         pseudo = CLIENTS[addr]["pseudo"]
         #Si l'utilisateur vient d'arriver
         if pseudo == "":
-            LenPseudo = await reader.read(1)
-            pseudo = (await reader.read(int.from_bytes(LenPseudo))).decode()
+            try:
+                LenPseudo = await reader.read(1)
+            except :
+                await DeleteHacker(addr,writer)
+            if int.from_bytes(LenPseudo) > 15:  #   Si le client envoie un pseudo superieur a 15
+                await DeleteHacker(addr,writer)
+                return
+            try :
+                pseudo = (await reader.read(int.from_bytes(LenPseudo))).decode()
+            except:
+                ErrorMessage(writer)
+                continue
+            await DisplayHistoric(writer,1)
             CLIENTS[addr]["pseudo"] = pseudo
             message = "\033[38;5;208m"+"Annonce : " + pseudo + " a rejoint la chatroom"
             await AddHistoric(message,1)
             await SendBroadCastMessage(addr,message,1)
             continue
-
-        header1 = await reader.read(1)#   on recupere le type de message
+        try:    #   Si on arrive pas a recevoir (client coupé)
+            header1 = await reader.read(1)#   on recupere le type de message
+        except:
+            message = "\033[38;5;208m"+f"Annonce : {pseudo} a quitté la chatroom"
+            await AddHistoric(message,CLIENTS[addr]["room"])
+            await SendBroadCastMessage(addr,message,CLIENTS[addr]["room"])
+            CLIENTS.pop(addr)
+            return
         headerNB = int.from_bytes(header1)
         if(headerNB == 1):   #   si le message est court
             LenMess = await reader.read(1)
@@ -146,10 +174,14 @@ async def handle_client_msg(reader,writer) :
             LenMess = await reader.read(int.from_bytes(LenLen))
             data = await reader.read(int.from_bytes(LenMess))
         elif headerNB == 3:  #   Changement de room
+            print("changement de room...")
             LenNB = await reader.read(2)
-            print(int.from_bytes(LenNB))
             RoomNB = await reader.read(int.from_bytes(LenNB))
             RoomNB = int.from_bytes(RoomNB) 
+            print(RoomNB)
+            if(RoomNB > 999999):
+                await DeleteHacker(addr,writer)
+                return
             #On afficher le message de deconnexion          
             message = "\033[38;5;208m"+f"Annonce : {pseudo} a quitté la chatroom"
             await AddHistoric(message,CLIENTS[addr]["room"])
@@ -177,7 +209,11 @@ async def handle_client_msg(reader,writer) :
         #On envoie le message a tout le monde
         color = CLIENTS[addr]["color"]
         room = CLIENTS[addr]["room"]
-        message = f"{color}{GetTime()} [{room}][{pseudo}] : {data.decode()}"
+        try:    #   Si la lecture des données recu ne fonctionne pas , a cause d'un caracter inconnu par exemple :
+            message = f"{color}{GetTime()} [{room}][{pseudo}] : {data.decode()}"
+        except:
+            await ErrorMessage(writer)  #   On envoie un message d'erreur
+            continue
         await AddHistoric(message,CLIENTS[addr]["room"])
         print(f"Message received from {addr[0]}:{addr[1]} : {message}")
         await SendBroadCastMessage(addr,message,CLIENTS[addr]["room"])

@@ -455,3 +455,25 @@ async def SendBroadCastMessage(who,message,room):
             await CLIENTS[client]["w"].drain()
 
 ```
+
+### 8. NTUI ( oui c'est moi qui ai créer cette partie)
+
+Je vais essayer de régler le plus de probleme par rapport aux users inputs 
+
+```python
+#   Cette fonction va juste print dans la console serveur qu'il a détécté un clien bizzare , et cela envoie un message au vilain hackerz
+async def DeleteHacker(addr,writer):
+    print(f"Client suspect : {addr[0]} : {addr[1]} ")
+    writer.write(("C'est pas bien de tricher , modifie pas le code , c'est pas bien").encode())  #   on lui empeche l'acces avec un message
+    await writer.drain()
+```
+
+J'ai modifié quelque partie de code pour en ajoutant  cette fonction , et si message bizzare est recu , alors on l'appelle  
+J'ai très surement oublié de régler pleins de probleme , mais le serveur est deja un "minimum" sécurisé face aux inputs en modifiant le code client 
+
+
+## Voila le resultat final :
+
+- fichier serveur : [serveur](./Bonus/server/chat_server_ii_6.py)
+
+- fichier client : [client](./Bonus/chat_client_ii_6.py)
